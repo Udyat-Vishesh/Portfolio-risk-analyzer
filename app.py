@@ -16,7 +16,7 @@ stock_options = {
                 }
 
                 # User selects stocks
-                selected_stocks = st.multiselect("Select Stocks", list(stock_options.keys()), default=['TCS', 'Apple'])
+selected_stocks = st.multiselect("Select Stocks", list(stock_options.keys()), default=['TCS', 'Apple'])
 
                 # Time period selection
                 time_period = st.selectbox("Select Time Period", ['1 Week', '6 Months', '1 Year'])
