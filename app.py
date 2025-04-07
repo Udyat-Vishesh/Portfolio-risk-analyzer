@@ -19,7 +19,7 @@ stock_options = {
 selected_stocks = st.multiselect("Select Stocks", list(stock_options.keys()), default=['TCS', 'Apple'])
 
                 # Time period selection
-                time_period = st.selectbox("Select Time Period", ['1 Week', '6 Months', '1 Year'])
+time_period = st.selectbox("Select Time Period", ['1 Week', '6 Months', '1 Year'])
                 period_days = {'1 Week': 7, '6 Months': 182, '1 Year': 365}
                 days = period_days[time_period]
 
