@@ -1,91 +1,79 @@
-# app.py
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 import numpy as np
-import yfinance as yf
-import matplotlib.pyplot as plt
+import plotly.express as px
+from datetime import date
 
-# Set layout
-st.set_page_config(layout="wide", page_title="Portfolio Risk Analyzer")
+# Title
 st.title("AI-Based Portfolio Risk Analyzer")
 
-# Ticker input
-user_input = st.text_input("Enter tickers (comma-separated, e.g., AAPL, TSLA, BTC-USD, ^NSEI):")
-selected_tickers = [ticker.strip().upper() for ticker in user_input.split(",") if ticker.strip()]
+# Custom stock search
+user_input = st.text_input("Enter stock names (e.g., Tesla, Apple, TCS, Nifty, BTC)")
 
-# Time period selection
-time_period = st.selectbox("Select Time Period", ['1 Week', '6 Months', '1 Year'])
-period_days = {'1 Week': 7, '6 Months': 182, '1 Year': 365}
-days = period_days[time_period]
+# Fetch ticker suggestions using yfinance
+if user_input:
+    search_result = yf.Ticker(user_input).info
+    st.write(f"**Showing results for:** {search_result.get('longName', 'Unknown')} ({user_input.upper()})")
+    selected_tickers = [user_input.upper()]
+else:
+    selected_tickers = []
 
-# Custom Weights Option
+# Custom date range selection
+start_date = st.date_input("Select Start Date", date(2023, 1, 1))
+end_date = st.date_input("Select End Date", date.today())
+
+# Optional: Custom weights
 use_custom_weights = st.checkbox("Use Custom Weights")
-custom_weights = []
+weights = []
 if use_custom_weights and selected_tickers:
     for ticker in selected_tickers:
-        weight = st.number_input(f"Weight for {ticker}", min_value=0.0, max_value=1.0, step=0.01)
-        custom_weights.append(weight)
-    total_weight = sum(custom_weights)
-    if total_weight != 1.0:
-        st.warning("Total weight must be exactly 1.0")
+        w = st.number_input(f"Weight for {ticker} (in %)", min_value=0.0, max_value=100.0, value=100.0/len(selected_tickers))
+        weights.append(w / 100)
+    weights = np.array(weights)
+    weights /= weights.sum()
 
-# Fetch and process data
-@st.cache_data
-def fetch_data(tickers, days):
-    data = yf.download(tickers, period=f"{days}d")['Close']
-    returns = data.pct_change().dropna()
-    return data, returns
+# Fetch price data
+if selected_tickers:
+    price_data = yf.download(selected_tickers, start=start_date, end=end_date)['Adj Close']
+    price_data = price_data.dropna()
 
-if selected_tickers and (not use_custom_weights or sum(custom_weights) == 1.0):
-    data, returns = fetch_data(selected_tickers, days)
+    # Normalize for graph
+    normalized = price_data / price_data.iloc[0] * 100
 
     # Portfolio returns
-    if use_custom_weights:
-        weights = np.array(custom_weights)
-    else:
-        weights = np.ones(len(selected_tickers)) / len(selected_tickers)
+    daily_returns = price_data.pct_change().dropna()
+    portfolio_returns = (daily_returns * weights).sum(axis=1) if use_custom_weights else daily_returns.mean(axis=1)
 
-    portfolio_returns = (returns * weights).sum(axis=1)
+    # Risk Metrics
+    avg_return = portfolio_returns.mean()
+    std_dev = portfolio_returns.std()
+    sharpe_ratio = avg_return / std_dev if std_dev != 0 else 0
 
-    # Risk metrics
-    def risk_metrics(returns):
-        volatility = returns.std()
-        sharpe_ratio = returns.mean() / volatility
-        cumulative = (1 + returns).cumprod()
-        peak = cumulative.cummax()
-        drawdown = (cumulative - peak) / peak
-        max_drawdown = drawdown.min()
-        return volatility, sharpe_ratio, max_drawdown, cumulative
+    risk_metrics = pd.DataFrame({
+        "Metric": ["Average Daily Return", "Standard Deviation", "Sharpe Ratio"],
+        "Value": [avg_return, std_dev, sharpe_ratio]
+    })
 
-    vol, sharpe, max_dd, cumulative_returns = risk_metrics(portfolio_returns)
-
-    # Show metrics
     st.subheader("Risk Metrics")
-    st.metric("Volatility (Std Dev)", f"{vol:.2%}")
-    st.metric("Sharpe Ratio", f"{sharpe:.2f}")
-    st.metric("Max Drawdown", f"{max_dd:.2%}")
+    st.dataframe(risk_metrics.style.format("{:.5f}").highlight_max(axis=0, color='lightgreen'))
 
-    # Graph selection
-    graph_options = ["Cumulative Returns", "Daily Returns", "Drawdown", "Asset Prices"]
-    selected_graphs = st.multiselect("Select Graphs to Display (up to 3)", graph_options, default=["Cumulative Returns"])
+    # Graph options
+    st.subheader("Portfolio Graphs")
+    graph_options = st.multiselect("Select Graphs to Display", ["Normalized Performance", "Portfolio Value Over Time", "Individual Stock Comparison"], default=["Normalized Performance"])
 
-    if "Cumulative Returns" in selected_graphs:
-        st.subheader("Cumulative Portfolio Return")
-        st.line_chart(cumulative_returns)
+    if "Normalized Performance" in graph_options:
+        fig1 = px.line(normalized, title="Normalized Stock Performance")
+        st.plotly_chart(fig1)
 
-    if "Daily Returns" in selected_graphs:
-        st.subheader("Daily Portfolio Returns")
-        st.line_chart(portfolio_returns)
+    if "Portfolio Value Over Time" in graph_options:
+        portfolio_value = (price_data * weights).sum(axis=1) if use_custom_weights else price_data.mean(axis=1)
+        fig2 = px.line(x=portfolio_value.index, y=portfolio_value.values, labels={'x': 'Date', 'y': 'Portfolio Value'}, title="Portfolio Value")
+        st.plotly_chart(fig2)
 
-    if "Drawdown" in selected_graphs:
-        drawdown = (1 + portfolio_returns).cumprod()
-        peak = drawdown.cummax()
-        drawdown_series = (drawdown - peak) / peak
-        st.subheader("Drawdown")
-        st.line_chart(drawdown_series)
+    if "Individual Stock Comparison" in graph_options:
+        fig3 = px.line(price_data, title="Individual Stock Price Comparison")
+        st.plotly_chart(fig3)
 
-    if "Asset Prices" in selected_graphs:
-        st.subheader("Asset Price Movement")
-        st.line_chart(data)
-
-# Note: Later add AI analysis module when user triggers it (to be added on request)
+st.markdown("---")
+st.caption("Built with love for finance and tech. Future AI analysis and reporting coming soon!")
