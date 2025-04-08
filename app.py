@@ -10,7 +10,7 @@ st.title("AI-Based Portfolio Risk Analyzer")
 st.write("Analyze and visualize risk-return metrics for your custom portfolio.")
 
 # Get API Key from Streamlit secrets
-api_key = st.secrets["RAPIDAPI"]["API_KEY"]
+api_key = st.secrets["RAPIDAPI"]["d3e6b90571msh8199fe969164faep11dda8jsn4e912cc7ed2a"]
 host = "yahoo-finance15.p.rapidapi.com"
 
 # Custom date range
