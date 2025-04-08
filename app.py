@@ -94,3 +94,5 @@ if selected_stocks:
 
 else:
     st.info("Please type a stock name to get suggestions and build a portfolio.")
+
+# Triggering new deployement
