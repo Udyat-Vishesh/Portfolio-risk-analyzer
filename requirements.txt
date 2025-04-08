@@ -1,7 +1,7 @@
 streamlit
-yfinance
 pandas
 matplotlib
 numpy
 plotly
 requests
+python-dotenv
