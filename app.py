@@ -1,123 +1,96 @@
 import streamlit as st
-import requests
 import pandas as pd
-import numpy as np
-import datetime
+import requests
 import plotly.express as px
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
+# Load environment variables
 load_dotenv()
-API_KEY = os.getenv("RAPIDAPI_KEY")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
+# App title
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="wide")
-
 st.title("AI-Powered Portfolio Risk Analyzer")
 
-# User input for stock search
-search_query = st.text_input("Enter stock names (e.g., Tesla, Apple):")
-suggestions = []
-
-if search_query:
+# Function to fetch real-time ticker data from Yahoo Finance via RapidAPI
+def search_tickers(query):
     url = "https://apidojo-yahoo-finance-v1.p.rapidapi.com/auto-complete"
-    querystring = {"q": search_query, "region": "US"}
+    params = {"q": query, "region": "US"}
     headers = {
-        "X-RapidAPI-Key": API_KEY,
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
         "X-RapidAPI-Host": "apidojo-yahoo-finance-v1.p.rapidapi.com"
     }
-    response = requests.get(url, headers=headers, params=querystring)
+    response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
-        data = response.json()
-        suggestions = [item["symbol"] + " - " + item["shortname"] for item in data["quotes"] if "symbol" in item]
+        results = response.json()["quotes"]
+        return [f"{item['symbol']} - {item['shortname']}" for item in results]
+    else:
+        return []
 
-selected_suggestions = st.multiselect("Select assets from suggestions:", suggestions)
-
-tickers = [s.split(" - ")[0] for s in selected_suggestions]
-
-# Custom date range
-start_date = st.date_input("Start Date", value=datetime.date(2020, 1, 1))
-end_date = st.date_input("End Date", value=datetime.date.today())
+# Select stocks
+st.subheader("Select Stocks/ETFs/Crypto")
+user_input = st.text_input("Enter stock names (e.g., Tesla, Apple, Bitcoin)", "")
+suggested = search_tickers(user_input) if user_input else []
+selected_stocks = st.multiselect("Suggestions:", options=suggested, key="stock_select")
 
 # Custom weights
-use_custom_weights = st.checkbox("Use Custom Weights")
+use_custom_weights = st.checkbox("Use custom weights?")
 weights = []
+if use_custom_weights and selected_stocks:
+    for stock in selected_stocks:
+        weight = st.number_input(f"Weight for {stock} (%)", min_value=0.0, max_value=100.0, step=1.0)
+        weights.append(weight / 100)
+    if sum(weights) != 1.0:
+        st.warning("The total of weights must be 100%.")
 
-if use_custom_weights and tickers:
-    total_weight = 0
-    for ticker in tickers:
-        weight = st.number_input(f"Weight for {ticker} (as decimal)", min_value=0.0, max_value=1.0, step=0.01)
-        weights.append(weight)
-        total_weight += weight
+# Custom date range
+st.subheader("Select Date Range")
+start_date = st.date_input("Start Date", value=datetime(2023, 1, 1))
+end_date = st.date_input("End Date", value=datetime.today())
 
-    if total_weight != 1.0:
-        st.warning("Total weights must sum to 1.")
-else:
-    weights = [1 / len(tickers)] * len(tickers) if tickers else []
+# Risk Metrics Calculation (dummy placeholder, replace with real API calls)
+def get_dummy_data(stocks, start, end):
+    dates = pd.date_range(start=start, end=end, freq='B')
+    data = {stock: (pd.Series(range(len(dates))) * 1.5).values for stock in stocks}
+    return pd.DataFrame(data, index=dates)
 
-# Fetch historical data
-def fetch_data(symbol):
-    url = "https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v3/get-historical-data"
-    querystring = {"symbol": symbol, "region": "US"}
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": "apidojo-yahoo-finance-v1.p.rapidapi.com"
-    }
-    response = requests.get(url, headers=headers, params=querystring)
-    if response.status_code == 200:
-        data = response.json().get("prices", [])
-        df = pd.DataFrame(data)
-        df = df[df["type"] == "history"]
-        df["date"] = pd.to_datetime(df["date"], unit="s")
-        df.set_index("date", inplace=True)
-        df = df[["close"]]
-        df.rename(columns={"close": symbol}, inplace=True)
-        df = df.loc[(df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))]
-        return df
-    return pd.DataFrame()
-
-# Process data
-price_data = pd.DataFrame()
-for ticker in tickers:
-    df = fetch_data(ticker)
-    if not df.empty:
-        price_data = pd.concat([price_data, df], axis=1)
-
-if not price_data.empty:
-    # Portfolio returns
-    daily_returns = price_data.pct_change().dropna()
-    weighted_returns = (daily_returns * weights).sum(axis=1)
-    portfolio_returns = (1 + weighted_returns).cumprod()
-
-    # Risk Metrics
-    volatility = weighted_returns.std()
-    avg_daily_return = weighted_returns.mean()
-    sharpe_ratio = avg_daily_return / volatility * np.sqrt(252)
-
-    metrics = pd.DataFrame({
-        "Metric": ["Volatility", "Average Daily Return", "Sharpe Ratio"],
-        "Value": [round(volatility, 4), round(avg_daily_return, 4), round(sharpe_ratio, 4)]
-    })
+if selected_stocks:
+    # Extract tickers only
+    tickers = [s.split(" - ")[0] for s in selected_stocks]
+    df = get_dummy_data(tickers, start_date, end_date)
+    st.subheader("Portfolio Data")
+    st.dataframe(df)
 
     st.subheader("Risk Metrics")
-    st.dataframe(metrics.style.highlight_max(axis=0, color='lightgreen'))
+    returns = df.pct_change().dropna()
+    risk_metrics = {
+        "Average Return (%)": returns.mean() * 100,
+        "Volatility (%)": returns.std() * 100,
+        "Sharpe Ratio": (returns.mean() / returns.std()).fillna(0)
+    }
+    metrics_df = pd.DataFrame(risk_metrics)
+    st.dataframe(metrics_df.style.highlight_max(axis=0, color="lightgreen"))
 
-    # Graph Options
-    st.subheader("Portfolio Graphs")
-    selected_graphs = st.multiselect(
-        "Choose graphs to display:",
-        ["Portfolio Trend", "Normalized Comparison", "Individual Asset Performance"],
-        default=["Portfolio Trend"]
-    )
+    # Graph options
+    st.subheader("Graphs")
+    graph_options = ["Cumulative Returns", "Daily Returns", "Correlation Heatmap"]
+    selected_graphs = st.multiselect("Choose graphs to display", graph_options)
 
-    if "Portfolio Trend" in selected_graphs:
-        st.plotly_chart(px.line(portfolio_returns, title="Portfolio Growth Over Time"))
+    if "Cumulative Returns" in selected_graphs:
+        cumulative = (1 + returns).cumprod()
+        fig = px.line(cumulative, title="Cumulative Returns")
+        st.plotly_chart(fig, use_container_width=True)
 
-    if "Normalized Comparison" in selected_graphs:
-        normalized = price_data / price_data.iloc[0]
-        st.plotly_chart(px.line(normalized, title="Normalized Asset Prices"))
+    if "Daily Returns" in selected_graphs:
+        fig = px.line(returns, title="Daily Returns")
+        st.plotly_chart(fig, use_container_width=True)
 
-    if "Individual Asset Performance" in selected_graphs:
-        st.plotly_chart(px.line(daily_returns.cumsum(), title="Individual Asset Cumulative Returns"))
+    if "Correlation Heatmap" in selected_graphs:
+        corr = returns.corr()
+        fig = px.imshow(corr, text_auto=True, title="Correlation Heatmap")
+        st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.warning("No data to display. Please check ticker names or date range.")
+    st.info("Please type a stock name to get suggestions and build a portfolio.")
