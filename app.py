@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Load environment variables
 load_dotenv()
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_API_KEY")
 
 # App title
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="wide")
