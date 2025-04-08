@@ -20,7 +20,7 @@ def search_tickers(query):
     params = {"q": query, "region": "US"}
     headers = {
         "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": "apidojo-yahoo-finance-v1.p.rapidapi.com"
+        "X-RapidAPI-Host": "yh.finance.p.rapidapi.com"
     }
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
