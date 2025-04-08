@@ -79,5 +79,5 @@ def home():
     return "Flask Portfolio Risk Analyzer is running!"
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
 
