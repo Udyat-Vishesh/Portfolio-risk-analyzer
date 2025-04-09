@@ -1,25 +1,29 @@
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
-}
+  const [query, setQuery] = useState('');
 
-export default App;
+    const handleSearch = () => {
+        console.log("Search clicked:", query);
+          };
+
+            return (
+                <div className="app">
+                      <h1 className="title">Portfolio Risk Analyzer</h1>
+                            <div className="search-container">
+                                    <input
+                                              type="text"
+                                                        placeholder="Search stock, ETF or crypto..."
+                                                                  value={query}
+                                                                            onChange={(e) => setQuery(e.target.value)}
+                                                                                      className="search-input"
+                                                                                              />
+                                                                                                      <button className="search-button" onClick={handleSearch}>Search</button>
+                                                                                                            </div>
+                                                                                                                </div>
+                                                                                                                  );
+                                                                                                                  }
+
+                                                                                                                  export default App;
+                                                                                                                  
